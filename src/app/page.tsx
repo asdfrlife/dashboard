@@ -106,7 +106,7 @@ export default async function OverviewPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-zinc-100">{health.uploads.count24h} <span className="text-zinc-500 text-sm font-normal">/ 8 max</span></div>
+            <div className="text-2xl font-bold text-zinc-100">{health.uploads.count24h} <span className="text-zinc-500 text-sm font-normal">/ 4 max</span></div>
             <Badge variant="outline" className={`mt-2 ${getStatusColor(health.uploads.status)}`}>
               {health.uploads.status}
             </Badge>
