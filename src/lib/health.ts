@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { getGithubRuns } from './github';
-import { differenceInMinutes, subHours } from 'date-fns';
+import { differenceInMinutes, subHours, differenceInDays } from 'date-fns';
 
 export type HealthStatus = 'OK' | 'WARNING' | 'CRITICAL' | 'UNKNOWN';
 
@@ -23,13 +23,17 @@ export interface DashboardHealth {
     status: HealthStatus;
     count: number;
   };
-  uploads: {
+  youtube: {
     status: HealthStatus;
     count24h: number;
   };
-  failed: {
+  instagram: {
     status: HealthStatus;
     count24h: number;
+  };
+  token: {
+    status: HealthStatus;
+    daysLeft: number | null;
   };
 }
 
@@ -45,19 +49,23 @@ export async function getDashboardHealth(): Promise<DashboardHealth> {
   const twentyFourHoursAgo = subHours(now, 24).toISOString();
 
   // 1. Scraper Health
-  const { data: scraperLogs } = await supabase
-    .from('run_logs')
+  const { data: scraperRuns } = await supabase
+    .from('scrape_runs')
     .select('created_at')
-    .eq('stage', 'scraper_run')
     .order('created_at', { ascending: false })
     .limit(1);
 
   let scraperStatus: HealthStatus = 'CRITICAL';
   let scraperAgo: number | null = null;
-  if (scraperLogs && scraperLogs.length > 0) {
-    scraperAgo = differenceInMinutes(now, new Date(scraperLogs[0].created_at));
+  if (scraperRuns && scraperRuns.length > 0) {
+    scraperAgo = differenceInMinutes(now, new Date(scraperRuns[0].created_at));
     if (scraperAgo < 90) scraperStatus = 'OK';
     else if (scraperAgo <= 180) scraperStatus = 'WARNING';
+    else scraperStatus = 'CRITICAL';
+  } else {
+    // Prompt says: "If there are no scrape_runs rows at all, show 'Scraper has never reported' with a short explanation, not an error."
+    // Let's set it to UNKNOWN so it doesn't trigger a CRITICAL overall status.
+    scraperStatus = 'UNKNOWN';
   }
 
   // 2. Pipeline (GitHub Actions)
@@ -77,20 +85,16 @@ export async function getDashboardHealth(): Promise<DashboardHealth> {
       pipelineStatus = 'OK';
     }
 
-    // Check if last 2 runs failed
     const lastTwo = githubRuns.slice(0, 2);
     if (lastTwo.length === 2 && lastTwo.every((r) => r.conclusion === 'failure')) {
       pipelineStatus = 'CRITICAL';
     }
     
-    // If the latest run failed but it's the only one or previous succeeded, maybe just warning?
-    // The prompt says: "CRITICAL if the last 2 runs failed; WARNING if no run in 90+ min."
-    // Let's assume OK if success, WARNING if 1 failure, CRITICAL if 2 failures, WARNING if >90m.
     if (pipelineStatus === 'UNKNOWN' && latestRun.conclusion === 'failure') {
         pipelineStatus = 'WARNING';
     }
   } else {
-    pipelineStatus = 'WARNING'; // no runs found
+    pipelineStatus = 'WARNING';
   }
 
   // 3. Queue Size
@@ -103,45 +107,55 @@ export async function getDashboardHealth(): Promise<DashboardHealth> {
   const queueStatus: HealthStatus = qCount > 20 ? 'WARNING' : 'OK';
 
   // 4. Stuck Videos
-  const thirtyMinsAgo = new Date(now.getTime() - 30 * 60000).toISOString();
   const { count: stuckCount } = await supabase
-    .from('processed_videos')
-    .select('*', { count: 'exact', head: true })
-    .in('processing_status', ['DOWNLOADING', 'RENDERING'])
-    .lt('updated_at', thirtyMinsAgo);
+    .from('v_stuck_videos')
+    .select('*', { count: 'exact', head: true });
 
   const sCount = stuckCount || 0;
-  const stuckStatus: HealthStatus = sCount > 0 ? 'WARNING' : 'OK'; // Prompt doesn't specify status for stuck, but having stuck is bad.
+  const stuckStatus: HealthStatus = sCount > 0 ? 'WARNING' : 'OK';
 
-  // 5. Uploads
-  const { count: uploadsCount } = await supabase
+  // 5. YouTube Uploads
+  const { count: youtubeCount } = await supabase
     .from('platform_deliveries')
     .select('*', { count: 'exact', head: true })
+    .eq('platform', 'youtube_shorts')
     .eq('status', 'PUBLISHED')
     .gte('created_at', twentyFourHoursAgo);
 
-  const uCount = uploadsCount || 0;
-  // Prompt: "Uploads: PUBLISHED deliveries in the last 24h vs the cap of 4." 
-  // It's mostly informational, but if it's over 4, could be an issue? Or maybe just OK.
-  const uploadsStatus: HealthStatus = 'OK';
+  const ytCount = youtubeCount || 0;
+  const ytStatus: HealthStatus = 'OK';
 
-  // 6. Failed Videos
-  const { count: failedCount } = await supabase
-    .from('processed_videos')
+  // 6. Instagram Uploads
+  const { count: instagramCount } = await supabase
+    .from('platform_deliveries')
     .select('*', { count: 'exact', head: true })
-    .eq('processing_status', 'FAILED')
-    .gte('updated_at', twentyFourHoursAgo);
-    
-  const fCount = failedCount || 0;
-  const failedStatus: HealthStatus = fCount > 0 ? 'WARNING' : 'OK';
+    .eq('platform', 'instagram_reels')
+    .eq('status', 'PUBLISHED')
+    .gte('created_at', twentyFourHoursAgo);
 
-  const overall = getWorstStatus([
-    scraperStatus,
+  const igCount = instagramCount || 0;
+  const igStatus: HealthStatus = 'OK';
+
+  // 7. Token Expiry
+  const tokenExpiryStr = process.env.TRIGGER_TOKEN_EXPIRES || '2026-11-05';
+  const tokenExpiryDate = new Date(tokenExpiryStr);
+  const daysLeft = differenceInDays(tokenExpiryDate, now);
+  
+  let tokenStatus: HealthStatus = 'OK';
+  if (daysLeft <= 7) tokenStatus = 'CRITICAL';
+  else if (daysLeft <= 14) tokenStatus = 'WARNING';
+
+  const overallStatuses = [
+    scraperStatus !== 'UNKNOWN' ? scraperStatus : 'OK',
     pipelineStatus,
     queueStatus,
     stuckStatus,
-    failedStatus,
-  ]);
+    ytStatus,
+    igStatus,
+    tokenStatus
+  ];
+
+  const overall = getWorstStatus(overallStatuses);
 
   return {
     overall,
@@ -149,7 +163,8 @@ export async function getDashboardHealth(): Promise<DashboardHealth> {
     pipeline: { status: pipelineStatus, lastRunConclusion: pipelineConclusion, lastRunAgoMinutes: pipelineAgo },
     queue: { status: queueStatus, count: qCount },
     stuck: { status: stuckStatus, count: sCount },
-    uploads: { status: uploadsStatus, count24h: uCount },
-    failed: { status: failedStatus, count24h: fCount },
+    youtube: { status: ytStatus, count24h: ytCount },
+    instagram: { status: igStatus, count24h: igCount },
+    token: { status: tokenStatus, daysLeft }
   };
 }

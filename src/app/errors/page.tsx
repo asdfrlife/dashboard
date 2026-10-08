@@ -17,7 +17,7 @@ export default async function ErrorsPage() {
   // 2. Fetch errors from platform_deliveries
   const { data: deliveryErrors } = await supabase
     .from('platform_deliveries')
-    .select('tweet_id, last_error, created_at')
+    .select('tweet_id, last_error, created_at, platform')
     .not('last_error', 'is', null)
     .gte('created_at', sevenDaysAgo);
 
@@ -28,8 +28,15 @@ export default async function ErrorsPage() {
     .eq('level', 'ERROR')
     .gte('created_at', sevenDaysAgo);
 
+  // 4. Fetch errors from scrape_runs
+  const { data: scrapeErrors } = await supabase
+    .from('scrape_runs')
+    .select('error_message, created_at')
+    .eq('status', 'ERROR')
+    .gte('created_at', sevenDaysAgo);
+
   // Merge and normalize errors
-  const allErrors: { message: string; timestamp: string; source: string; id?: string }[] = [];
+  const allErrors: { message: string; timestamp: string; source: string; platform?: string; id?: string }[] = [];
 
   videoErrors?.forEach(e => {
     if (e.error_message) {
@@ -39,13 +46,19 @@ export default async function ErrorsPage() {
 
   deliveryErrors?.forEach(e => {
     if (e.last_error) {
-      allErrors.push({ message: e.last_error, timestamp: e.created_at, source: 'Delivery', id: e.tweet_id || undefined });
+      allErrors.push({ message: e.last_error, timestamp: e.created_at, source: 'Delivery', platform: e.platform, id: e.tweet_id || undefined });
     }
   });
 
   logErrors?.forEach(e => {
     if (e.message) {
       allErrors.push({ message: e.message, timestamp: e.created_at, source: 'System Log' });
+    }
+  });
+
+  scrapeErrors?.forEach(e => {
+    if (e.error_message) {
+      allErrors.push({ message: e.error_message, timestamp: e.created_at, source: 'Scraper' });
     }
   });
 
