@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart2, Eye, ThumbsUp, MessageCircle, Share2, PlaySquare, Camera } from 'lucide-react';
+import { BarChart2, Eye, ThumbsUp, PlaySquare, Camera } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,18 +29,21 @@ export default async function PerformancePage() {
 
   // Deduplicate to get latest snapshot per post
   const latestMetrics = Object.values(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     metrics.reduce((acc: any, curr) => {
       if (!acc[curr.platform_post_id]) {
         acc[curr.platform_post_id] = curr;
       }
       return acc;
     }, {})
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ) as any[];
 
   // Top 10 by views
   const top10 = [...latestMetrics].sort((a, b) => b.views - a.views).slice(0, 10);
 
   // Aggregated views by account
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewsByAccount = latestMetrics.reduce((acc: any, curr) => {
     const username = curr.processed_videos?.x_username || 'Unknown';
     if (!acc[username]) acc[username] = 0;
@@ -48,6 +51,7 @@ export default async function PerformancePage() {
     return acc;
   }, {});
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const topAccounts = Object.entries(viewsByAccount).sort((a: any, b: any) => b[1] - a[1]);
 
   return (
@@ -98,7 +102,7 @@ export default async function PerformancePage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {topAccounts.map(([username, views], i) => (
+              {topAccounts.map(([username, views]) => (
                 <div key={username} className="flex items-center justify-between p-3 rounded-lg border border-zinc-800/50 bg-zinc-950/50">
                   <span className="text-sm font-medium text-zinc-300">{username}</span>
                   <div className="flex items-center gap-2">

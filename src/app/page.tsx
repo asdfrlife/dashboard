@@ -1,8 +1,7 @@
 import { getDashboardHealth } from '@/lib/health';
 import { supabase } from '@/lib/supabase';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Activity, AlertTriangle, CheckCircle2, Clock, Upload, XCircle, RefreshCw, PlaySquare, Camera, Database, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Activity, AlertTriangle, CheckCircle2, XCircle, RefreshCw, PlaySquare, Camera, Database, Settings, ChevronDown } from 'lucide-react';
 import { subDays, differenceInDays } from 'date-fns';
 import { OverviewCharts } from '@/components/OverviewCharts';
 import { RunLogsFeed } from '@/components/RunLogsFeed';
