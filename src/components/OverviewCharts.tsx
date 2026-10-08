@@ -71,7 +71,7 @@ export function OverviewCharts({ uploads, failures, dateField = 'updated_at', pl
     };
   });
 
-  (uploads || []).forEach((u: any) => {
+  (uploads || []).forEach((u: Record<string, string>) => {
     const ts = u.published_at || u.created_at;
     if (ts) {
       const d = format(new Date(ts), 'MMM dd');
@@ -80,7 +80,7 @@ export function OverviewCharts({ uploads, failures, dateField = 'updated_at', pl
     }
   });
 
-  (failures || []).forEach((f: any) => {
+  (failures || []).forEach((f: Record<string, string>) => {
     const ts = f[dateField];
     if (ts) {
       const d = format(new Date(ts), 'MMM dd');

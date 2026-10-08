@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Instagram, Upload, XCircle, Activity, Info } from 'lucide-react';
+import { Camera, Upload, XCircle, Activity, Info } from 'lucide-react';
 import { subDays } from 'date-fns';
 import { OverviewCharts } from '@/components/OverviewCharts';
 
@@ -67,7 +67,7 @@ export default async function InstagramPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 flex items-center justify-center text-white">
-            <Instagram className="w-4 h-4" />
+            <Camera className="w-4 h-4" />
           </div>
           Instagram Delivery
         </h1>

@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Video, AlertCircle, PlayCircle, Youtube, Instagram, Database, BarChart2 } from 'lucide-react';
+import { LayoutDashboard, Video, AlertCircle, PlayCircle, PlaySquare, Camera, Database, BarChart2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const links = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
-  { href: '/youtube', label: 'YouTube', icon: Youtube },
-  { href: '/instagram', label: 'Instagram', icon: Instagram },
+  { href: '/youtube', label: 'YouTube', icon: PlaySquare },
+  { href: '/instagram', label: 'Instagram', icon: Camera },
   { href: '/scraping', label: 'Scraping', icon: Database },
   { href: '/performance', label: 'Metrics', icon: BarChart2 },
   { href: '/videos', label: 'Videos', icon: Video },

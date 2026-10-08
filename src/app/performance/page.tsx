@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart2, Eye, ThumbsUp, MessageCircle, Share2, Youtube, Instagram } from 'lucide-react';
+import { BarChart2, Eye, ThumbsUp, MessageCircle, Share2, PlaySquare, Camera } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,7 +71,7 @@ export default async function PerformancePage() {
                   <div className="flex items-center gap-3">
                     <span className="text-xl font-bold text-zinc-700 w-6 text-center">{i + 1}</span>
                     <div className="w-8 h-8 rounded bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-                      {post.platform === 'youtube_shorts' ? <Youtube className="w-4 h-4 text-red-500" /> : <Instagram className="w-4 h-4 text-pink-500" />}
+                      {post.platform === 'youtube_shorts' ? <PlaySquare className="w-4 h-4 text-red-500" /> : <Camera className="w-4 h-4 text-pink-500" />}
                     </div>
                     <div>
                       <p className="text-xs font-mono text-zinc-400">ID: {post.platform_post_id}</p>

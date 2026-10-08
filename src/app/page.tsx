@@ -2,7 +2,7 @@ import { getDashboardHealth } from '@/lib/health';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Activity, AlertTriangle, CheckCircle2, Clock, Upload, XCircle, RefreshCw, Youtube, Instagram, Database, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, Clock, Upload, XCircle, RefreshCw, PlaySquare, Camera, Database, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import { subDays, differenceInDays } from 'date-fns';
 import { OverviewCharts } from '@/components/OverviewCharts';
 import { RunLogsFeed } from '@/components/RunLogsFeed';
@@ -120,7 +120,7 @@ export default async function OverviewPage() {
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-zinc-100 flex items-center gap-2">
-              <Youtube className="w-4 h-4 text-red-500" /> YouTube
+              <PlaySquare className="w-4 h-4 text-red-500" /> YouTube
             </CardTitle>
             <div className={`w-2 h-2 rounded-full ${health.youtube.status === 'OK' ? 'bg-emerald-500' : 'bg-red-500'}`} />
           </CardHeader>
@@ -141,7 +141,7 @@ export default async function OverviewPage() {
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-zinc-100 flex items-center gap-2">
-              <Instagram className="w-4 h-4 text-pink-500" /> Instagram
+              <Camera className="w-4 h-4 text-pink-500" /> Instagram
             </CardTitle>
             <div className={`w-2 h-2 rounded-full ${health.instagram.status === 'OK' ? 'bg-emerald-500' : 'bg-red-500'}`} />
           </CardHeader>

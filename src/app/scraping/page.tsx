@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Database, AlertTriangle, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { Database, AlertTriangle, Clock } from 'lucide-react';
 import { differenceInMinutes } from 'date-fns';
 
 export const dynamic = 'force-dynamic';

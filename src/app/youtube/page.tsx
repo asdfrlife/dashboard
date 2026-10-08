@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Youtube, Upload, XCircle, Activity, AlertCircle } from 'lucide-react';
+import { PlaySquare, Upload, XCircle, Activity } from 'lucide-react';
 import { subDays } from 'date-fns';
 import { OverviewCharts } from '@/components/OverviewCharts';
 
@@ -64,7 +64,7 @@ export default async function YouTubePage() {
     <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-red-500 flex items-center gap-2">
-          <Youtube className="w-6 h-6" /> YouTube Delivery
+          <PlaySquare className="w-6 h-6" /> YouTube Delivery
         </h1>
         <p className="text-sm text-zinc-400">YouTube Shorts publishing metrics and history.</p>
       </div>
