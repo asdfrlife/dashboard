@@ -1,40 +1,53 @@
 import { supabase } from '@/lib/supabase';
+import { getPipelineSettings } from '@/lib/settings';
+import { calculateCycle } from '@/lib/cycle';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PlaySquare, Upload, XCircle, Activity } from 'lucide-react';
 import { subDays } from 'date-fns';
 import { OverviewCharts } from '@/components/OverviewCharts';
+import { CycleProgressTracker } from '@/components/CycleProgressTracker';
 
 export const dynamic = 'force-dynamic';
 
 export default async function YouTubePage() {
-  const twentyFourHoursAgo = subDays(new Date(), 1).toISOString();
-  const fourteenDaysAgo = subDays(new Date(), 14).toISOString();
-  
-  const dailyCap = parseInt(process.env.DAILY_CAP || '8');
+  // Fetch dynamic pipeline settings
+  const settings = await getPipelineSettings();
+  const dailyCap = settings.daily_cap;
 
-  // KPIs
-  const { count: published24h } = await supabase
+  // Calculate current exact 24-hour cycle window
+  const cycle = calculateCycle(settings.first_run_at);
+
+  const fourteenDaysAgo = subDays(new Date(), 14).toISOString();
+
+  // KPIs: Count published YouTube videos in current 24-hour cycle
+  const { count: cycleUploadsCount } = await supabase
     .from('platform_deliveries')
     .select('*', { count: 'exact', head: true })
     .eq('platform', 'youtube_shorts')
     .eq('status', 'PUBLISHED')
-    .gte('published_at', twentyFourHoursAgo);
+    .gte('published_at', cycle.currentCycleStartIso);
 
-  const { count: failed24h } = await supabase
+  const cycleUploads = cycleUploadsCount || 0;
+
+  // Count failed deliveries in current cycle
+  const { count: failedCycleCount } = await supabase
     .from('platform_deliveries')
     .select('*', { count: 'exact', head: true })
     .eq('platform', 'youtube_shorts')
     .eq('status', 'FAILED')
-    .gte('created_at', twentyFourHoursAgo);
+    .gte('created_at', cycle.currentCycleStartIso);
 
+  const failedCycle = failedCycleCount || 0;
+
+  // Lifetime total published YouTube videos
   const { count: totalPublished } = await supabase
     .from('platform_deliveries')
     .select('*', { count: 'exact', head: true })
     .eq('platform', 'youtube_shorts')
     .eq('status', 'PUBLISHED');
 
-  // Chart data
+  // Chart data: 14 days uploads and failures
   const { data: uploads } = await supabase
     .from('platform_deliveries')
     .select('published_at')
@@ -57,57 +70,70 @@ export default async function YouTubePage() {
     .order('created_at', { ascending: false })
     .limit(50);
 
-  const pubCount = published24h || 0;
-  const isCapped = pubCount >= dailyCap;
-
   return (
     <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-red-500 flex items-center gap-2">
           <PlaySquare className="w-6 h-6" /> YouTube Delivery
         </h1>
-        <p className="text-sm text-zinc-400">YouTube Shorts publishing metrics and history.</p>
+        <p className="text-sm text-zinc-400">
+          YouTube Shorts publishing metrics, precision 24-hour cycle tracker, and delivery history.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Current Cycle Uploads with Progress Bar & Countdown */}
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-zinc-400 flex items-center gap-2">
-              <Upload className="w-3 h-3" /> Published (24h)
+              <Upload className="w-3.5 h-3.5 text-red-500" /> Current Cycle Uploads
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-zinc-100">
-              {pubCount} <span className="text-zinc-500 text-sm font-normal">/ {dailyCap} max</span>
+            <CycleProgressTracker
+              cycleUploads={cycleUploads}
+              dailyCap={dailyCap}
+              currentCycleStartIso={cycle.currentCycleStartIso}
+              currentCycleEndIso={cycle.currentCycleEndIso}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Failed in Current Cycle */}
+        <Card className="bg-zinc-900 border-zinc-800 flex flex-col justify-between">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-medium text-zinc-400 flex items-center gap-2">
+              <XCircle className="w-3.5 h-3.5 text-red-400" /> Failed (Cycle)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-2xl font-bold text-zinc-100">{failedCycle}</div>
+            <div className="flex items-center justify-between">
+              <Badge
+                variant="outline"
+                className={
+                  failedCycle > 0
+                    ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                    : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                }
+              >
+                {failedCycle > 0 ? 'WARNING' : 'OK'}
+              </Badge>
+              <span className="text-[11px] text-zinc-500">Since cycle reset</span>
             </div>
-            <Badge variant="outline" className={`mt-2 ${isCapped ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>
-              {isCapped ? 'CAPPED' : 'OK'}
-            </Badge>
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900 border-zinc-800">
+        {/* Total Published */}
+        <Card className="bg-zinc-900 border-zinc-800 flex flex-col justify-between">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-zinc-400 flex items-center gap-2">
-              <XCircle className="w-3 h-3" /> Failed (24h)
+              <Activity className="w-3.5 h-3.5 text-zinc-400" /> Total Published
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-zinc-100">{failed24h || 0}</div>
-            <Badge variant="outline" className={`mt-2 ${(failed24h || 0) > 0 ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>
-              {(failed24h || 0) > 0 ? 'WARNING' : 'OK'}
-            </Badge>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-zinc-900 border-zinc-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-zinc-400 flex items-center gap-2">
-              <Activity className="w-3 h-3" /> Total Published
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <div className="text-2xl font-bold text-zinc-100">{totalPublished || 0}</div>
+            <p className="text-xs text-zinc-500">All-time successful uploads</p>
           </CardContent>
         </Card>
       </div>

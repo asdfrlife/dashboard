@@ -26,6 +26,7 @@ export interface DashboardHealth {
   youtube: {
     status: HealthStatus;
     count24h: number;
+    cycleUploads?: number;
   };
   instagram: {
     status: HealthStatus;
@@ -44,7 +45,7 @@ function getWorstStatus(statuses: HealthStatus[]): HealthStatus {
   return 'UNKNOWN';
 }
 
-export async function getDashboardHealth(): Promise<DashboardHealth> {
+export async function getDashboardHealth(cycleStartIso?: string): Promise<DashboardHealth> {
   const now = new Date();
   const twentyFourHoursAgo = subHours(now, 24).toISOString();
 
@@ -114,13 +115,14 @@ export async function getDashboardHealth(): Promise<DashboardHealth> {
   const sCount = stuckCount || 0;
   const stuckStatus: HealthStatus = sCount > 0 ? 'WARNING' : 'OK';
 
-  // 5. YouTube Uploads
+  // 5. YouTube Uploads (Filtered by exact cycle start if provided, or last 24h)
+  const ytQueryStart = cycleStartIso || twentyFourHoursAgo;
   const { count: youtubeCount } = await supabase
     .from('platform_deliveries')
     .select('*', { count: 'exact', head: true })
     .eq('platform', 'youtube_shorts')
     .eq('status', 'PUBLISHED')
-    .gte('created_at', twentyFourHoursAgo);
+    .gte('published_at', ytQueryStart);
 
   const ytCount = youtubeCount || 0;
   const ytStatus: HealthStatus = 'OK';
@@ -163,7 +165,7 @@ export async function getDashboardHealth(): Promise<DashboardHealth> {
     pipeline: { status: pipelineStatus, lastRunConclusion: pipelineConclusion, lastRunAgoMinutes: pipelineAgo },
     queue: { status: queueStatus, count: qCount },
     stuck: { status: stuckStatus, count: sCount },
-    youtube: { status: ytStatus, count24h: ytCount },
+    youtube: { status: ytStatus, count24h: ytCount, cycleUploads: ytCount },
     instagram: { status: igStatus, count24h: igCount },
     token: { status: tokenStatus, daysLeft }
   };

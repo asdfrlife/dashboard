@@ -54,3 +54,10 @@ export type GithubRun = {
   created_at: string;
   updated_at: string;
 };
+
+export type PipelineSettings = {
+  id: number;
+  daily_cap: number;
+  first_run_at: string;
+};
+

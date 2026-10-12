@@ -1,16 +1,47 @@
 import { getDashboardHealth } from '@/lib/health';
 import { supabase } from '@/lib/supabase';
+import { getPipelineSettings } from '@/lib/settings';
+import { calculateCycle } from '@/lib/cycle';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Activity, AlertTriangle, CheckCircle2, XCircle, RefreshCw, PlaySquare, Camera, Database, Settings, ChevronDown } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, XCircle, RefreshCw, PlaySquare, Camera, Database, Settings, ChevronDown, Clock } from 'lucide-react';
 import { subDays, differenceInDays } from 'date-fns';
 import { OverviewCharts } from '@/components/OverviewCharts';
 import { RunLogsFeed } from '@/components/RunLogsFeed';
 import { AccountSummary } from '@/components/AccountSummary';
+import { PipelineSettingsCard } from '@/components/PipelineSettingsCard';
+import { CycleProgressTracker } from '@/components/CycleProgressTracker';
 
 export const dynamic = 'force-dynamic';
 
 export default async function OverviewPage() {
-  const health = await getDashboardHealth();
+  // Fetch pipeline settings (daily_cap and first_run_at)
+  const settings = await getPipelineSettings();
+
+  // Calculate current cycle using exact 24-hour cycle math
+  const cycle = calculateCycle(settings.first_run_at);
+
+  // Fetch health with cycle start anchor for YouTube
+  const health = await getDashboardHealth(cycle.currentCycleStartIso);
+
+  // Fetch YouTube uploads published within the current 24-hour cycle
+  const { count: cycleUploadsCount } = await supabase
+    .from('platform_deliveries')
+    .select('*', { count: 'exact', head: true })
+    .eq('platform', 'youtube_shorts')
+    .eq('status', 'PUBLISHED')
+    .gte('published_at', cycle.currentCycleStartIso);
+
+  const cycleUploads = cycleUploadsCount || 0;
+
+  // Fetch YouTube failed deliveries in current cycle
+  const { count: failedCycleCount } = await supabase
+    .from('platform_deliveries')
+    .select('*', { count: 'exact', head: true })
+    .eq('platform', 'youtube_shorts')
+    .eq('status', 'FAILED')
+    .gte('created_at', cycle.currentCycleStartIso);
+
+  const failedInCycle = failedCycleCount || 0;
 
   // Fetch charts data: last 14 days uploads per platform
   const fourteenDaysAgo = subDays(new Date(), 14).toISOString();
@@ -48,7 +79,6 @@ export default async function OverviewPage() {
     }
   };
 
-  const dailyCap = process.env.DAILY_CAP || '8';
   const tokenExpiresStr = process.env.TRIGGER_TOKEN_EXPIRES || '2026-11-05';
   const tokenDaysLeft = differenceInDays(new Date(tokenExpiresStr), new Date());
   
@@ -56,12 +86,14 @@ export default async function OverviewPage() {
   if (tokenDaysLeft <= 7) tokenColor = 'text-red-500 font-bold';
   else if (tokenDaysLeft <= 14) tokenColor = 'text-amber-500 font-bold';
 
+  const isYoutubeCapped = cycleUploads >= settings.daily_cap;
+
   return (
     <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Pipeline Overview</h1>
-          <p className="text-sm text-zinc-400">System health and recent activity.</p>
+          <p className="text-sm text-zinc-400">System health, precision 24h cycle metrics, and pipeline controls.</p>
         </div>
         <div className="flex items-center gap-3">
           <p className="text-xs text-zinc-500 flex items-center gap-1">
@@ -91,14 +123,21 @@ export default async function OverviewPage() {
           </span>
         </summary>
         <div className="border-t border-zinc-800 p-4 pt-4 bg-zinc-950/50 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div>
               <p className="text-xs text-zinc-500 uppercase font-semibold tracking-wider">Schedule</p>
               <p className="text-sm text-zinc-300 mt-1">Every 3 hours at :12 (Africa/Addis_Ababa)</p>
             </div>
             <div>
               <p className="text-xs text-zinc-500 uppercase font-semibold tracking-wider">YouTube Daily Cap</p>
-              <p className="text-sm text-zinc-300 mt-1">{dailyCap} videos</p>
+              <p className="text-sm text-zinc-300 mt-1 font-medium">{settings.daily_cap} videos / 24h</p>
+            </div>
+            <div>
+              <p className="text-xs text-zinc-500 uppercase font-semibold tracking-wider">Current Cycle</p>
+              <p className="text-sm text-zinc-300 mt-1 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                Resets in {cycle.formattedCountdown}
+              </p>
             </div>
             <div>
               <p className="text-xs text-zinc-500 uppercase font-semibold tracking-wider">GitHub Trigger Token</p>
@@ -115,28 +154,50 @@ export default async function OverviewPage() {
         </div>
       </details>
 
+      {/* Settings Form Card: Fetch and edit daily_cap and first_run_at */}
+      <PipelineSettingsCard initialSettings={settings} />
+
+      {/* Main KPI Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* YouTube KPI: Exact Cycle Tracking */}
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-zinc-100 flex items-center gap-2">
               <PlaySquare className="w-4 h-4 text-red-500" /> YouTube
             </CardTitle>
-            <div className={`w-2 h-2 rounded-full ${health.youtube.status === 'OK' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+            <div
+              className={`w-2 h-2 rounded-full ${
+                isYoutubeCapped ? 'bg-amber-500' : health.youtube.status === 'OK' ? 'bg-emerald-500' : 'bg-red-500'
+              }`}
+              title={isYoutubeCapped ? 'Daily cap reached' : 'Normal'}
+            />
           </CardHeader>
           <CardContent>
-             <div className="flex justify-between items-end mt-2">
-               <div>
-                 <p className="text-xs text-zinc-500">Published (24h)</p>
-                 <p className="text-xl font-bold text-zinc-100">{health.youtube.count24h}</p>
-               </div>
-               <div className="text-right">
-                 <p className="text-xs text-zinc-500">Failed (24h)</p>
-                 <p className="text-xl font-bold text-red-400">0</p>
-               </div>
-             </div>
+            <div className="flex justify-between items-baseline mt-1">
+              <div>
+                <p className="text-xs text-zinc-400 font-medium">Current Cycle Uploads</p>
+                <p className="text-xl font-bold text-zinc-100">
+                  {cycleUploads}{' '}
+                  <span className="text-zinc-500 text-xs font-normal">/ {settings.daily_cap} max</span>
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-zinc-500">Failed (Cycle)</p>
+                <p className="text-xl font-bold text-red-400">{failedInCycle}</p>
+              </div>
+            </div>
+
+            <CycleProgressTracker
+              cycleUploads={cycleUploads}
+              dailyCap={settings.daily_cap}
+              currentCycleStartIso={cycle.currentCycleStartIso}
+              currentCycleEndIso={cycle.currentCycleEndIso}
+              compact
+            />
           </CardContent>
         </Card>
 
+        {/* Instagram KPI */}
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-zinc-100 flex items-center gap-2">
@@ -158,6 +219,7 @@ export default async function OverviewPage() {
           </CardContent>
         </Card>
 
+        {/* Scraper KPI */}
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-zinc-100 flex items-center gap-2">
@@ -173,6 +235,7 @@ export default async function OverviewPage() {
           </CardContent>
         </Card>
 
+        {/* Pipeline KPI */}
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-zinc-100 flex items-center gap-2">
