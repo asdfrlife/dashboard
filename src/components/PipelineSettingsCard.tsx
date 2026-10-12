@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Settings2, Save, CheckCircle2, AlertCircle, RotateCcw, Clock, Calendar, ShieldCheck } from 'lucide-react';
+import { Settings2, Save, CheckCircle2, AlertCircle, RotateCcw, Clock, Calendar, ShieldCheck, Zap } from 'lucide-react';
 import { PipelineSettings } from '@/types';
 import { calculateCycle, toDateTimeLocalInput, fromDateTimeLocalInput } from '@/lib/cycle';
 
@@ -26,7 +26,7 @@ export function PipelineSettingsCard({ initialSettings }: PipelineSettingsCardPr
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Compute cycle in real-time based on form state
+  // Compute cycle in real-time based on the configured start time
   const computedCycle = (() => {
     try {
       if (!firstRunLocal) return null;
@@ -36,6 +36,11 @@ export function PipelineSettingsCard({ initialSettings }: PipelineSettingsCardPr
       return null;
     }
   })();
+
+  const handleSetToNow = () => {
+    const nowIso = new Date().toISOString();
+    setFirstRunLocal(toDateTimeLocalInput(nowIso));
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +53,7 @@ export function PipelineSettingsCard({ initialSettings }: PipelineSettingsCardPr
       }
 
       if (!firstRunLocal) {
-        throw new Error('Please specify the first run timestamp');
+        throw new Error('Please specify when the cycle started');
       }
 
       const isoFirstRun = fromDateTimeLocalInput(firstRunLocal);
@@ -72,7 +77,7 @@ export function PipelineSettingsCard({ initialSettings }: PipelineSettingsCardPr
 
       setFeedback({
         type: 'success',
-        message: 'Settings saved and 24-hour cycle updated successfully!',
+        message: 'Cycle settings saved! End time and reset countdown have been updated.',
       });
 
       startTransition(() => {
@@ -102,15 +107,15 @@ export function PipelineSettingsCard({ initialSettings }: PipelineSettingsCardPr
             </div>
             <div>
               <CardTitle className="text-base font-semibold text-zinc-100">
-                Pipeline Settings & 24h Cycle Tracker
+                Cycle Configuration & Daily Cap
               </CardTitle>
               <CardDescription className="text-xs text-zinc-400 mt-0.5">
-                Configure YouTube daily upload quota and exact cron job cycle origin.
+                Set when your cycle started. The dashboard will automatically calculate when it ends and resets.
               </CardDescription>
             </div>
           </div>
           <Badge variant="outline" className="w-fit bg-zinc-800 text-zinc-300 border-zinc-700 text-xs">
-            Target: pipeline_settings (id=1)
+            Auto-calculated 24h Window
           </Badge>
         </div>
       </CardHeader>
@@ -122,7 +127,7 @@ export function PipelineSettingsCard({ initialSettings }: PipelineSettingsCardPr
             <div className="space-y-2">
               <label htmlFor="daily_cap" className="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-zinc-400" />
-                YouTube Daily Cap (Videos)
+                Daily Upload Cap
               </label>
               <Input
                 id="daily_cap"
@@ -136,16 +141,26 @@ export function PipelineSettingsCard({ initialSettings }: PipelineSettingsCardPr
                 placeholder="e.g. 8"
               />
               <p className="text-[11px] text-zinc-500">
-                Maximum videos permitted per exact 24-hour cycle before pausing uploads.
+                Maximum videos allowed per 24-hour cycle before pausing uploads.
               </p>
             </div>
 
-            {/* First Run At Input */}
+            {/* Cycle Start Time Input */}
             <div className="space-y-2">
-              <label htmlFor="first_run_at" className="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-zinc-400" />
-                Cron First Run (Origin Date & Time)
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="first_run_at" className="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-zinc-400" />
+                  When the Cycle Started
+                </label>
+                <button
+                  type="button"
+                  onClick={handleSetToNow}
+                  className="text-[11px] text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors"
+                  title="Set cycle start to right now"
+                >
+                  <Zap className="w-3 h-3" /> Start Now
+                </button>
+              </div>
               <Input
                 id="first_run_at"
                 type="datetime-local"
@@ -156,44 +171,60 @@ export function PipelineSettingsCard({ initialSettings }: PipelineSettingsCardPr
                 className="bg-zinc-950 border-zinc-800 text-zinc-100 focus:border-red-500 focus:ring-red-500/20 text-sm h-10 [color-scheme:dark]"
               />
               <p className="text-[11px] text-zinc-500">
-                Exact start time of the first cron run. 24-hour cycles compound continuously from this anchor.
+                Customize the exact date & time your cycle began. We calculate when it ends 24 hours later.
               </p>
             </div>
           </div>
 
-          {/* Computed Cycle Preview */}
+          {/* Real-time Calculation Result */}
           {computedCycle && (
-            <div className="p-4 rounded-lg bg-zinc-950 border border-zinc-800/80 space-y-3">
-              <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-300">
-                  <Clock className="w-3.5 h-3.5 text-red-400" />
-                  <span>Calculated Cycle Preview</span>
+            <div className="p-4 rounded-lg bg-zinc-950 border border-zinc-800 space-y-3">
+              <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2.5">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-200">
+                  <Clock className="w-4 h-4 text-red-400" />
+                  <span>Calculated Cycle Schedule</span>
                 </div>
-                <span className="text-[11px] text-zinc-500 font-mono">
-                  Cycle #{computedCycle.periodsPassed + 1} ({computedCycle.periodsPassed} periods elapsed)
-                </span>
+                <Badge variant="outline" className="text-[11px] bg-red-500/10 text-red-400 border-red-500/20 font-mono">
+                  Reset in {computedCycle.formattedCountdown}
+                </Badge>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                <div>
-                  <span className="text-zinc-500 block text-[11px]">Current Cycle Start:</span>
-                  <span className="text-zinc-200 font-medium">
-                    {computedCycle.currentCycleStart.toLocaleString()}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div className="p-2.5 rounded bg-zinc-900/60 border border-zinc-800/50">
+                  <span className="text-zinc-500 block text-[11px] mb-0.5">Cycle Started:</span>
+                  <span className="text-zinc-200 font-semibold text-sm">
+                    {computedCycle.currentCycleStart.toLocaleString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </span>
                 </div>
-                <div>
-                  <span className="text-zinc-500 block text-[11px]">Current Cycle End:</span>
-                  <span className="text-zinc-200 font-medium">
-                    {computedCycle.currentCycleEnd.toLocaleString()}
+
+                <div className="p-2.5 rounded bg-zinc-900/60 border border-zinc-800/50">
+                  <span className="text-zinc-500 block text-[11px] mb-0.5">Calculated Cycle End:</span>
+                  <span className="text-emerald-400 font-semibold text-sm">
+                    {computedCycle.currentCycleEnd.toLocaleString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </span>
                 </div>
-                <div>
-                  <span className="text-zinc-500 block text-[11px]">Next Reset In:</span>
-                  <span className="text-red-400 font-semibold">
+
+                <div className="p-2.5 rounded bg-zinc-900/60 border border-zinc-800/50">
+                  <span className="text-zinc-500 block text-[11px] mb-0.5">Time Remaining:</span>
+                  <span className="text-zinc-100 font-semibold text-sm">
                     {computedCycle.formattedCountdown}
                   </span>
                 </div>
               </div>
+
+              <p className="text-[11px] text-zinc-500 pt-1">
+                YouTube videos published after <strong className="text-zinc-400">{computedCycle.currentCycleStart.toLocaleTimeString()}</strong> count against the {dailyCap}-video daily cap until <strong className="text-zinc-400">{computedCycle.currentCycleEnd.toLocaleTimeString()}</strong>.
+              </p>
             </div>
           )}
 
@@ -235,7 +266,7 @@ export function PipelineSettingsCard({ initialSettings }: PipelineSettingsCardPr
               className="bg-red-600 hover:bg-red-500 text-white font-medium"
             >
               <Save className="w-3.5 h-3.5 mr-1" />
-              {isSaving ? 'Saving...' : 'Save Settings'}
+              {isSaving ? 'Saving...' : 'Save & Calculate'}
             </Button>
           </div>
         </form>
